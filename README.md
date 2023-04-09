@@ -1,38 +1,82 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# structure
 
-## Getting Started
+    - pages
+        - _app.tsx
+        - index.tsx
+        - about.tsx
+        - contact.tsx
+        - api/
+            - index.ts
+            - v1.ts
+            - v2.ts
+    - components/
+        - header.tsx
+        - footer.tsx
+        - sidebar.tsx
+    - layouts/
 
-First, run the development server:
+1. components and layouts should be in Uppercase and pages should be in lowercase
+2. to make component defaults see `components/Meta.tsx`
+3. "\_app.tsx" is the root component of the application, recive the pages and render them
+4. "\_document.tsx" used to customize default html document, it render only once in server so dont use events like onClick
+5. in every page (with "\_app.tsx") we can warap it with a layout, and we can ue Head component to add meta tags, title, etc
+6. in styles/ we can define Page.module.css and import it in the page, and we can use it like this: `<div className={styles.container}>`. in this we we have style for every page.
+7. navigation done by `Link` see ArticleList
+8. for nesting routing see `articl/[id]/index.tsx` and see how it get the id from the url
+9. for API routing see `api/` directory
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+## data fetching
+
+### getStaticProps
+
+`getStaticProps` is a function that is used to fetch data at build time (run at `next build`)
+
+```ts
+export async function getStaticProps(context) {
+  return {
+    props: {
+      // props for your component
+    },
+  };
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+if we use it inside dynamic route we should use `getStaticPaths` to tell nextjs which paths we want to generate at build time
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+```ts
+export async function getStaticPaths() {
+  const articles = await fetch("http://localhost:3000/api/articles");
+  const articles = await articles.json();
+  const ids = articles.map((article) => article.id);
+  // paths equal to: [{ params: { id: "1" } }, { params: { id: "2" } }, { params: { id: "3" } }];
+  const paths = ids.map((id) => ({ params: { id: id.toString() } }));
+  return {
+    paths,
+    // if no data provide 404 page
+    fallback: false,
+  };
+}
+```
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+### getserverSideProps
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+`getServerSideProps` is a function that is used to fetch data at request time
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+```ts
+export async function getServerSideProps(context) {
+  const { id } = context.params; // equalto get the id from the url
+  return {
+    props: {
+      // props for your component
+    },
+  };
+}
+```
 
-## Learn More
+## static website
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+1. in package.json add command `"export": "next export"`
+2. install `npm i -D serve`
+3. add script `"serve": "serve -s out"`
+4. run `npm run export` to export the website
+5. run `npm run serve` to serve the website
