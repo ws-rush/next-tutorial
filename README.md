@@ -1,82 +1,180 @@
+> for older versions see `befor_13` branch
+
 # structure
 
-    - pages
-        - _app.tsx
-        - index.tsx
-        - about.tsx
-        - contact.tsx
-        - api/
-            - index.ts
-            - v1.ts
-            - v2.ts
-    - components/
-        - header.tsx
-        - footer.tsx
-        - sidebar.tsx
-    - layouts/
+```
+  - app/
+    - components/ # accessed by @/app/components
+      - Meta.tsx # default meta tags
+      - Nav.tsx # navigation
+    - api/
+      - hello/
+        - route.ts # /api/hello
+    - layout.tsx # layout for all pages
+    - loading.tsx # loader for all pages
+    - page.tsx # /index page
+    - about/
+      - team/
+        - page.tsx # /about/team page
+      - [id]/
+        - page.tsx # /about/:id page
+      - page.tsx # /about page
+      - layout.tsx # layout for all about pages
+```
 
-1. components and layouts should be in Uppercase and pages should be in lowercase
-2. to make component defaults see `components/Meta.tsx`
-3. "\_app.tsx" is the root component of the application, recive the pages and render them
-4. "\_document.tsx" used to customize default html document, it render only once in server so dont use events like onClick
-5. in every page (with "\_app.tsx") we can warap it with a layout, and we can ue Head component to add meta tags, title, etc
-6. in styles/ we can define Page.module.css and import it in the page, and we can use it like this: `<div className={styles.container}>`. in this we we have style for every page.
-7. navigation done by `Link` see ArticleList
-8. for nesting routing see `articl/[id]/index.tsx` and see how it get the id from the url
-9. for API routing see `api/` directory
+**NBs**
 
-## data fetching
-
-### getStaticProps
-
-`getStaticProps` is a function that is used to fetch data at build time (run at `next build`)
+1. layouts pages accept `children` prop
+2. [id]/pages accept `params` prop
+3. loading page component renderd if not all page components are loaded, if you have server side component need a time , enacpsulate it with `Suspense`
+4. used in `layouts`s and `pages`s
 
 ```ts
-export async function getStaticProps(context) {
+// either Static metadata
+export const metadata = {
+  title: "...",
+};
+
+// or Dynamic metadata
+export async function generateMetadata({ params }) {
   return {
-    props: {
-      // props for your component
-    },
+    title: "...",
   };
 }
 ```
 
-if we use it inside dynamic route we should use `getStaticPaths` to tell nextjs which paths we want to generate at build time
+# next modules
 
-```ts
-export async function getStaticPaths() {
-  const articles = await fetch("http://localhost:3000/api/articles");
-  const articles = await articles.json();
-  const ids = articles.map((article) => article.id);
-  // paths equal to: [{ params: { id: "1" } }, { params: { id: "2" } }, { params: { id: "3" } }];
-  const paths = ids.map((id) => ({ params: { id: id.toString() } }));
-  return {
-    paths,
-    // if no data provide 404 page
-    fallback: false,
-  };
+**next/head**
+
+```tsx
+impoer Link from "next/link";
+
+export default function Page() {
+  // default rplace is false
+  // default prefetch is true
+  return <Link href="/dashboard" replace prefetch={false}>Dashboard</Link>;
 }
 ```
 
-### getserverSideProps
+**next/font**
 
-`getServerSideProps` is a function that is used to fetch data at request time
+```tsx
+import { Poppins } from "next/font/google";
 
-```ts
-export async function getServerSideProps(context) {
-  const { id } = context.params; // equalto get the id from the url
-  return {
-    props: {
-      // props for your component
-    },
-  };
+const poppins = Poppins({
+  weights: [400, 700],
+  styles: ["normal", "italic"],
+  subsets: ["latin", "latin-ext"],
+});
+
+export default function Page() {
+  return <h1 className={{ poppins.className }}>hello world</h1>;
 }
 ```
 
-## static website
+**next/image**
 
-1. in package.json add command `"export": "next export"`
-2. install `npm i -D serve`
-3. add script `"serve": "serve -s out"`
-4. run `npm run export` to export the website
-5. run `npm run serve` to serve the website
+```tsx
+import Image from "next/image";
+
+export default function Page() {
+  return (
+    <Image
+      src="/image.png"
+      alt="image"
+      width={500}
+      height={500}
+      layout="responsive"
+      objectFit="cover"
+      objectPosition="center"
+      priority={true}
+      quality={100}
+    />
+  );
+}
+```
+
+# Components (sever side and client side)
+
+...
+
+# fetching data
+
+> there is no `getStaticProps` or `getServerSideProps` in components in next 13.
+> so we use async functions to fetch data, or useEffect to fetch data.
+
+**server side**
+
+```tsx
+async function Albums({ artistId }) {
+  const { data } = await fetcher(`/api/albums?artistId=${artistId}`);
+
+  return (
+    <div>
+      {data.items.map((album) => (
+        <div key={album.id}>{album.name}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+if component doesnt encapulated with `Suspense`, it's page will not be rendered until all components are loaded. so you will see loader untill all page components are loaded. so focus to encapsulate async components with `Suspense`.
+
+**client side**
+
+we have to methods to get data, with `useEffect` and specify loader inside component, or with `use` hook and specify loader from `Suspense` component.
+
+```tsx
+// with `useEffect`
+
+import { useEffect, useState } from "react";
+
+function Albums({ artistId }) {
+  const [albums, setAlbums] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetcher(`/api/albums?artistId=${artistId}`).then(({ data }) => {
+      setAlbums(data.items);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div>loading...</div>;
+
+  return (
+    <div>
+      {albums.map((album) => (
+        <div key={album.id}>{album.name}</div>
+      ))}
+    </div>
+  );
+}
+
+// with `use` hook
+import { use } from "react";
+
+function Albums({ artistId }) {
+  const { data: albums } = use(`/api/albums?artistId=${artistId}`);
+
+  return (
+    <div>
+      {albums.map((album) => (
+        <div key={album.id}>{album.name}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+# API
+
+...
+
+# NextAuth
+
+# Database
+
+> see `wusaby-rush` prisma repo
